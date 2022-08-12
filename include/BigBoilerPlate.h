@@ -21,6 +21,8 @@ private:
     std::string path_uppercase;
     std::string project_name;
 
+    const std::string quote = "\"";
+
     std::vector<std::string> folders;
     std::vector<std::string> packages;
 

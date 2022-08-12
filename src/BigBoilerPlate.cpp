@@ -66,8 +66,6 @@ void BoilerPlate::add_installs()
 
     if(package_manager == "vcpkg")
     {
-        system("cd ~");
-
         if(current_OS != "Window")
         {
             int installed = system("~/vcpkg/vcpkg --version");
@@ -78,44 +76,128 @@ void BoilerPlate::add_installs()
                 system("git clone https://github.com/Microsoft/vcpkg.git");
                 system("~/vcpkg/bootstrap-vcpkg.sh");
             }  
+        }
+
+        else {
+            int installed = system("~\vcpkg\vcpkg --version");
+
+            if(installed != 0){
+                //Begin install of vcpkg
+                std::cout << "Installing vcpkg for you, at your root directory";
+                system("git clone https://github.com/Microsoft/vcpkg.git");
+                system("~\vcpkg\bootstrap-vcpkg.bat");
+            }  
+        }
                 //Begin install libraries
-            for(auto const& lib : packages){
+        for(auto const& lib : packages){
                 std::string fitted_lib = "~/vcpkg/vcpkg install " + lib;
                 const char* char_string = fitted_lib.c_str();
                 system(char_string);
+                system("~/vcpkg/vcpkg integrate install");
 
                 std::array<char, 128> buffer;
                 std::string result;
-                std::unique_ptr<FILE, decltype(&pclose)> pipe(popen("~/vcpkg/vcpkg install fmt", "r"), pclose);
+                std::string current_string;
 
-                while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
-                    result += buffer.data();
+            //Need a unique ptr in order to fetch the data from the terminal, it then gets stored in an array
+            std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(char_string, "r"), pclose);
+
+            while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+                for(size_t i = 0; i < buffer.size(); i++){
+                    if(buffer[i] == '(' && buffer[0] != 'R'){
+                        result += buffer.data();
+                        break;
+                    }
+                    current_string += buffer[i];
                 }
+            }
 
                 writing_file.close();
                 writing_file.open("CMakeLists.txt", std::ios_base::app);
 
                 writing_file << result << std::endl;
-            }
-        }
-
-        else {
-
         }
         
-
         writing_file.close();
-        writing_file.open("CMakeLists", std::ios_base::app);
-    }
+        writing_file.open("vcpkg.json", std::ios_base::app);
 
+        writing_file << "{" << std::endl 
+        << quote << "name" << quote << ": " << quote << project_name << quote << "," << std::endl
+        << quote << "version" << quote << ": " << quote << "1.0" << quote << "," << std::endl
+        << quote << "dependencies" << quote << ": [" << std::endl;
+
+        for(auto const& pkg : packages){
+            writing_file << quote << pkg << quote;
+            if(pkg != packages.back())
+                writing_file << "," << std::endl;
+        }
+
+        writing_file << std::endl << "]" << std::endl << "}" << std::endl;
+
+    }
+    else if(package_manager == "conan") {
+            int installed = system("conan --version");
+            //We'll need to the conanfile.txt
+            if(installed != 0){
+                //Begin install of conan
+            if(current_OS != "Window")
+            {
+                system("brew install python");
+            }
+            else {
+                system("curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py");
+                system("python get-pip.py");
+            }
+                system("pip install conan");
+        }  
     
+        //Create the first conanfile
+        writing_file.close();
+        writing_file.open("conanfile.txt", std::ios_base::app);
+        writing_file << "[requires]" << std::endl;
+
+     for(auto const& lib : packages){
+                std::string fitted_lib = "conan search " + lib + " -r=conancenter";
+                const char* char_string = fitted_lib.c_str();
+                system(char_string);
+
+                std::array<char, 128> buffer;
+                std::string result;
+
+            //Need a unique ptr in order to fetch the data from the terminal, it then gets stored in an array
+            std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(char_string, "r"), pclose);
+
+            while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+                result = buffer.data();
+            }
+
+            writing_file.close();
+            writing_file.open("conanfile.txt", std::ios_base::app);
+
+            writing_file << result << std::endl;
+
+        }
+            //After adding dependencies to the conan file we must write to the CMakeFile
+
+            writing_file.close();
+            writing_file.open("CMakeLists.txt", std::ios_base::app);
+
+            writing_file << "include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)" << std::endl
+            << "conan_basic_setup()" << std::endl << std::endl
+            << "target_link_libraries(testConan ${CONAN_LIBS})" << std::endl << std::endl;
+
+        //After generating the conanfile stuff, we can add the generator
+        writing_file.close();
+        writing_file.open("conanfile.txt", std::ios_base::app);
+        writing_file << std::endl << std::endl << "[generators]" << std::endl << "cmake" << std::endl;
+
+    }
 }
 
 
 void BoilerPlate::create_system()
 {
     namespace fs = std::filesystem;
-    const std::string quote = "\"";
     //First we can fetch the OS as a MACRO, then we need to begin building out the file structure
 
     fs::path main_path = fs::current_path();
@@ -135,8 +217,8 @@ void BoilerPlate::create_system()
     //May want to get macros of most cpp versions
         writing_file << "cmake_minimum_required(VERSION 3.23)" << std::endl << std::endl <<
         "project(" << project_name << "VERSION 1.0)" << std::endl << std::endl 
-        << "set(CMAKE_CXX_STANDARD 20)" << std::endl << std::endl << "set(CMAKE_CXX_STANDARD_REQUIRED TRUE)" << std::endl
-        << "add_executable(" << project_name << " main.cpp)" << std::endl << std::endl;
+        << "set(CMAKE_CXX_STANDARD 20)" << std::endl << "set(CMAKE_CXX_STANDARD_REQUIRED TRUE)" << std::endl
+        << std::endl << "add_executable(" << project_name << " main.cpp)" << std::endl << std::endl;
     }
 
     //We need to go through each folder, enter it, then write a cpp, h, and CMake test file
