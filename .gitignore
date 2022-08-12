@@ -46,3 +46,4 @@ _deps
 *.app
 
 [Bb]uild
+.vscode

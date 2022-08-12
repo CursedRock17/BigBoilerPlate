@@ -1,8 +1,8 @@
 #include <iostream>
-
 #include <fstream>
 #include <filesystem>
-
+#include <array>
+#include <memory>
 
 #include "../include/BigBoilerPlate.h"
 
@@ -59,12 +59,65 @@ std::string BoilerPlate::getOsName()
     #endif
 }   
 
+void BoilerPlate::add_installs()
+{
+    //Begin installs for package manager and whatever, can be a multithreaded function
+    std::string current_OS = getOsName();
+
+    if(package_manager == "vcpkg")
+    {
+        system("cd ~");
+
+        if(current_OS != "Window")
+        {
+            int installed = system("~/vcpkg/vcpkg --version");
+
+            if(installed != 0){
+                //Begin install of vcpkg
+                std::cout << "Installing vcpkg for you, at your root directory";
+                system("git clone https://github.com/Microsoft/vcpkg.git");
+                system("~/vcpkg/bootstrap-vcpkg.sh");
+            }  
+                //Begin install libraries
+            for(auto const& lib : packages){
+                std::string fitted_lib = "~/vcpkg/vcpkg install " + lib;
+                const char* char_string = fitted_lib.c_str();
+                system(char_string);
+
+                std::array<char, 128> buffer;
+                std::string result;
+                std::unique_ptr<FILE, decltype(&pclose)> pipe(popen("~/vcpkg/vcpkg install fmt", "r"), pclose);
+
+                while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+                    result += buffer.data();
+                }
+
+                writing_file.close();
+                writing_file.open("CMakeLists.txt", std::ios_base::app);
+
+                writing_file << result << std::endl;
+            }
+        }
+
+        else {
+
+        }
+        
+
+        writing_file.close();
+        writing_file.open("CMakeLists", std::ios_base::app);
+    }
+
+    
+}
+
+
 void BoilerPlate::create_system()
 {
     namespace fs = std::filesystem;
     const std::string quote = "\"";
-    std::string current_OS = getOsName();
     //First we can fetch the OS as a MACRO, then we need to begin building out the file structure
+
     fs::path main_path = fs::current_path();
 
     //Create the original folder to hold the top level main
@@ -130,6 +183,7 @@ void BoilerPlate::create_system()
             writing_file.open("CMakeLists.txt", std::ios_base::app);
 
             writing_file << "add_subdirectory(" << path << ")" << std::endl;
+            writing_file << "target_link_libraries(" << project_name << "PUBLIC" << path << ")" << std::endl;
         }
 
         //          Cmake Section          //
@@ -144,6 +198,14 @@ void BoilerPlate::create_system()
         // Main Section Files //
         
 
+    }
+
+    //Now to include all the users extended libraries i.e: boost
+    if(package_manager == "vcpkg" || package_manager == "conan")
+    {
+        std::thread work_system(&BoilerPlate::add_installs, this);
+
+        work_system.join();
     }
 
 

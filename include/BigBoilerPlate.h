@@ -5,6 +5,7 @@
 #include <vector>
 #include <fstream>
 #include <algorithm> 
+#include <thread>
 
 
 class BoilerPlate {
@@ -29,7 +30,9 @@ private:
     std::ifstream reading_file;
     std::ofstream writing_file;
 
+    //Private functions
     std::string getOsName();
+    void add_installs();
 };
 
 #endif
