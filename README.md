@@ -1,4 +1,4 @@
-### A Simple library for setting up boilerplate
+### A Simple library for setting up boilerplate in C++
 
 This is a very basic project that sets up project archecture for you, so you don't have to manually add folders and installs.
 It's done through the CLI as it saves time, just enter in the basic stuff for your project. 
